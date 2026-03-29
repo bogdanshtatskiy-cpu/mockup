@@ -1,75 +1,70 @@
-// Инициализация холстов. preserveObjectStacking не дает выбранному объекту прыгать поверх теней
+console.log("Скрипт запущен! Инициализация холстов...");
+
 const canvasFront = new fabric.Canvas('tshirt-canvas-front', { preserveObjectStacking: true });
 const canvasBack = new fabric.Canvas('tshirt-canvas-back', { preserveObjectStacking: true });
 
-// Переменная для отслеживания активной стороны
 let currentCanvas = canvasFront;
-
-// Переменные для хранения системных слоев
 let baseFront, shadowFront;
 let baseBack, shadowBack;
 
-// 1. ФУНКЦИЯ ЗАГРУЗКИ ШАБЛОНОВ (БАЗЫ И ТЕНЕЙ)
-function initMockup() {
-    // --- ЗАГРУЗКА ПЕРЕДА ---
-    fabric.Image.fromURL('front-base.png', (img) => {
-        baseFront = img;
-        baseFront.set({ selectable: false, evented: false });
-        canvasFront.add(baseFront);
-        canvasFront.sendToBack(baseFront);
-    });
-
-    fabric.Image.fromURL('front-shadows.png', (img) => {
-        shadowFront = img;
-        shadowFront.set({ 
-            selectable: false, 
+// Функция для безопасной загрузки изображений
+function loadImage(url, canvas, isShadow, callback) {
+    console.log(`Попытка загрузить: ${url}`);
+    
+    fabric.Image.fromURL(url, (img) => {
+        if (!img) {
+            console.error(`❌ ОШИБКА: Файл ${url} не найден или не может быть загружен!`);
+            return;
+        }
+        
+        console.log(`✅ УСПЕХ: Файл ${url} загружен!`);
+        
+        img.set({
+            selectable: false,
             evented: false,
-            globalCompositeOperation: 'multiply' // Режим умножения для складок
+            // Если это тени, применяем режим умножения
+            globalCompositeOperation: isShadow ? 'multiply' : 'source-over'
         });
-        canvasFront.add(shadowFront);
-    });
 
-    // --- ЗАГРУЗКА СПИНЫ ---
-    fabric.Image.fromURL('back-base.png', (img) => {
-        baseBack = img;
-        baseBack.set({ selectable: false, evented: false });
-        canvasBack.add(baseBack);
-        canvasBack.sendToBack(baseBack);
-    });
-
-    fabric.Image.fromURL('back-shadows.png', (img) => {
-        shadowBack = img;
-        shadowBack.set({ 
-            selectable: false, 
-            evented: false,
-            globalCompositeOperation: 'multiply'
-        });
-        canvasBack.add(shadowBack);
+        canvas.add(img);
+        
+        // Базовый слой отправляем на самый задний план
+        if (!isShadow) {
+            canvas.sendToBack(img);
+        }
+        
+        if (callback) callback(img);
     });
 }
 
-// Запускаем загрузку шаблонов при открытии страницы
+function initMockup() {
+    // Загружаем переднюю часть
+    loadImage('front-base.png', canvasFront, false, (img) => { baseFront = img; });
+    loadImage('front-shadows.png', canvasFront, true, (img) => { shadowFront = img; });
+
+    // Загружаем заднюю часть
+    loadImage('back-base.png', canvasBack, false, (img) => { baseBack = img; });
+    loadImage('back-shadows.png', canvasBack, true, (img) => { shadowBack = img; });
+}
+
 initMockup();
 
-// 2. ИЗМЕНЕНИЕ ЦВЕТА ФУТБОЛКИ
+// Изменение цвета
 document.getElementById('shirt-color').addEventListener('input', (e) => {
     const color = e.target.value;
+    console.log(`Меняем цвет на: ${color}`);
     
-    // Создаем фильтр для перекрашивания
     const filter = new fabric.Image.filters.BlendColor({
         color: color,
         mode: 'tint',
         alpha: 1
     });
 
-    // Применяем фильтр к базе спереди
     if (baseFront) {
         baseFront.filters[0] = filter;
         baseFront.applyFilters();
         canvasFront.renderAll();
     }
-    
-    // Применяем фильтр к базе сзади
     if (baseBack) {
         baseBack.filters[0] = filter;
         baseBack.applyFilters();
@@ -77,10 +72,12 @@ document.getElementById('shirt-color').addEventListener('input', (e) => {
     }
 });
 
-// 3. ЗАГРУЗКА ИЗОБРАЖЕНИЯ НА ФУТБОЛКУ
+// Загрузка принта
 document.getElementById('image-upload').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    console.log(`Загрузка пользовательского принта: ${file.name}`);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -89,78 +86,45 @@ document.getElementById('image-upload').addEventListener('change', (e) => {
         imgObj.onload = () => {
             const fabricImage = new fabric.Image(imgObj);
             
-            // Настройки загруженной картинки
             fabricImage.set({
                 left: currentCanvas.width / 2,
                 top: currentCanvas.height / 2,
                 originX: 'center',
                 originY: 'center',
-                globalCompositeOperation: 'source-atop', // Обрезает картинку по контуру базы
+                globalCompositeOperation: 'source-atop',
                 borderColor: '#007bff',
                 cornerColor: '#007bff',
                 cornerSize: 10,
                 transparentCorners: false
             });
             
-            // Масштабируем, если картинка огромная
-            if (fabricImage.width > 200) {
-                fabricImage.scaleToWidth(200);
-            }
+            if (fabricImage.width > 200) fabricImage.scaleToWidth(200);
 
             currentCanvas.add(fabricImage);
             
-            // Убеждаемся, что тени остались поверх новой картинки
             const shadow = currentCanvas === canvasFront ? shadowFront : shadowBack;
-            if (shadow) {
-                currentCanvas.bringToFront(shadow);
-            }
+            if (shadow) currentCanvas.bringToFront(shadow);
             
-            // Делаем добавленную картинку активной для редактирования
             currentCanvas.setActiveObject(fabricImage);
             currentCanvas.renderAll();
-            
-            // Очищаем input, чтобы можно было загрузить ту же картинку еще раз
             e.target.value = '';
         }
     }
     reader.readAsDataURL(file);
 });
 
-// 4. ПЕРЕКЛЮЧЕНИЕ СТОРОН (СПЕРЕДИ / СЗАДИ)
-const viewRadios = document.querySelectorAll('input[name="shirt-view"]');
-const frontView = document.getElementById('front-view');
-const backView = document.getElementById('back-view');
-
-viewRadios.forEach(radio => {
+// Переключение сторон
+document.querySelectorAll('input[name="shirt-view"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
+        console.log(`Переключение на вид: ${e.target.value}`);
         if (e.target.value === 'front') {
-            frontView.style.display = 'block';
-            backView.style.display = 'none';
+            document.getElementById('front-view').style.display = 'block';
+            document.getElementById('back-view').style.display = 'none';
             currentCanvas = canvasFront;
         } else {
-            frontView.style.display = 'none';
-            backView.style.display = 'block';
+            document.getElementById('front-view').style.display = 'none';
+            document.getElementById('back-view').style.display = 'block';
             currentCanvas = canvasBack;
         }
     });
-});
-
-// 5. СКАЧИВАНИЕ РЕЗУЛЬТАТА
-document.getElementById('download-btn').addEventListener('click', () => {
-    // Убираем рамки выделения с активного объекта перед сохранением
-    currentCanvas.discardActiveObject();
-    currentCanvas.renderAll();
-    
-    // Генерируем изображение
-    const dataURL = currentCanvas.toDataURL({
-        format: 'png',
-        quality: 1,
-        multiplier: 2 // Увеличивает качество (разрешение) скачанного файла в 2 раза
-    });
-    
-    // Инициируем скачивание
-    const link = document.createElement('a');
-    link.href = dataURL;
-    link.download = `tshirt-mockup-${currentCanvas === canvasFront ? 'front' : 'back'}.png`;
-    link.click();
 });
