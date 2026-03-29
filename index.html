@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T-Shirt Mockup Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+    <div class="canvas-container-wrapper">
+        <div id="front-view">
+            <canvas id="tshirt-canvas-front" width="500" height="600"></canvas>
+        </div>
+        <div id="back-view" style="display: none;">
+            <canvas id="tshirt-canvas-back" width="500" height="600"></canvas>
+        </div>
+    </div>
+
+    <div class="controls-panel">
+        <h2>Создай свой дизайн</h2>
+        
+        <div class="control-group view-toggle">
+            <input type="radio" id="view-front" name="shirt-view" value="front" checked>
+            <label for="view-front" class="toggle-btn">Спереди</label>
+            
+            <input type="radio" id="view-back" name="shirt-view" value="back">
+            <label for="view-back" class="toggle-btn">Сзади</label>
+        </div>
+        
+        <div class="control-group">
+            <label for="shirt-color">Цвет футболки:</label>
+            <input type="color" id="shirt-color" value="#ffffff">
+        </div>
+
+        <div class="control-group">
+            <label for="image-upload" class="custom-file-upload">
+                Загрузить принт
+            </label>
+            <input type="file" id="image-upload" accept="image/*">
+        </div>
+
+        <button id="download-btn" class="primary-btn">Скачать мокап</button>
+    </div>
+</div>
+</body>
+</html>
