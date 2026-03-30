@@ -7,42 +7,47 @@ let currentCanvas = canvasFront;
 let baseFront, shadowFront;
 let baseBack, shadowBack;
 
-// Функция для безопасной загрузки изображений
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ ЗАГРУЗКИ
 function loadImage(url, canvas, isShadow, callback) {
     console.log(`Попытка загрузить: ${url}`);
     
     fabric.Image.fromURL(url, (img) => {
         if (!img) {
-            console.error(`❌ ОШИБКА: Файл ${url} не найден или не может быть загружен!`);
+            console.error(`❌ ОШИБКА: Файл ${url} не загрузился!`);
             return;
         }
         
         console.log(`✅ УСПЕХ: Файл ${url} загружен!`);
         
+        // Подгоняем размер картинки точно под размер холста
+        img.scaleToWidth(canvas.width);
+        img.scaleToHeight(canvas.height);
+
         img.set({
             selectable: false,
             evented: false,
-            // Если это тени, применяем режим умножения
+            originX: 'left',
+            originY: 'top',
             globalCompositeOperation: isShadow ? 'multiply' : 'source-over'
         });
 
         canvas.add(img);
         
-        // Базовый слой отправляем на самый задний план
         if (!isShadow) {
             canvas.sendToBack(img);
         }
         
         if (callback) callback(img);
+
+        // КРИТИЧНОЕ ИСПРАВЛЕНИЕ: принудительно отрисовываем холст после добавления картинки
+        canvas.renderAll(); 
     });
 }
 
 function initMockup() {
-    // Загружаем переднюю часть
     loadImage('front-base.png', canvasFront, false, (img) => { baseFront = img; });
     loadImage('front-shadows.png', canvasFront, true, (img) => { shadowFront = img; });
 
-    // Загружаем заднюю часть
     loadImage('back-base.png', canvasBack, false, (img) => { baseBack = img; });
     loadImage('back-shadows.png', canvasBack, true, (img) => { shadowBack = img; });
 }
@@ -72,12 +77,10 @@ document.getElementById('shirt-color').addEventListener('input', (e) => {
     }
 });
 
-// Загрузка принта
+// Загрузка пользовательского принта
 document.getElementById('image-upload').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    console.log(`Загрузка пользовательского принта: ${file.name}`);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -116,7 +119,6 @@ document.getElementById('image-upload').addEventListener('change', (e) => {
 // Переключение сторон
 document.querySelectorAll('input[name="shirt-view"]').forEach(radio => {
     radio.addEventListener('change', (e) => {
-        console.log(`Переключение на вид: ${e.target.value}`);
         if (e.target.value === 'front') {
             document.getElementById('front-view').style.display = 'block';
             document.getElementById('back-view').style.display = 'none';
@@ -126,5 +128,24 @@ document.querySelectorAll('input[name="shirt-view"]').forEach(radio => {
             document.getElementById('back-view').style.display = 'block';
             currentCanvas = canvasBack;
         }
+        // Перерисовываем активный холст при переключении
+        currentCanvas.renderAll();
     });
+});
+
+// Экспорт
+document.getElementById('download-btn').addEventListener('click', () => {
+    currentCanvas.discardActiveObject();
+    currentCanvas.renderAll();
+    
+    const dataURL = currentCanvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 2
+    });
+    
+    const link = document.createElement('a');
+    link.href = dataURL;
+    link.download = `mockup-${currentCanvas === canvasFront ? 'front' : 'back'}.png`;
+    link.click();
 });
